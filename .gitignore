@@ -1,0 +1,16 @@
+# Web
+web/node_modules/
+web/dist/
+web/.env
+web/.env.local
+
+# Bot
+bot/orders.json
+bot/qris.jpg
+bot/__pycache__/
+bot/*.pyc
+bot/.env
+
+# OS
+.DS_Store
+Thumbs.db

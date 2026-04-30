@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 
-// ─── STORAGE HELPERS ──────────────────────────────────────────────────────────
+// ─── STORAGE HELPERS (localStorage) ──────────────────────────────────────────
 const store = {
   async get(key, def) {
-    try { const r = await window.storage.get(key); return r ? JSON.parse(r.value) : def; }
-    catch { return def; }
+    try {
+      const val = localStorage.getItem(key);
+      return val ? JSON.parse(val) : def;
+    } catch { return def; }
   },
   async set(key, val) {
-    try { await window.storage.set(key, JSON.stringify(val)); } catch {}
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
   }
 };
 
@@ -87,7 +89,7 @@ const INIT_CATALOG = [
 const INIT_SETTINGS = {
   minItems: 3,
   markup: 1000,
-  telegramBot: "KopiHematBot",
+  telegramBot: "KopiHematBot",     // ← GANTI dengan username bot kamu (tanpa @)
   adminPass: "admin123",
   storeName: "Kopi Hemat",
   tagline: "Harga Orang Dalem 💸 Buat Semua!",
@@ -239,27 +241,25 @@ export default function App() {
   const [adminAuth, setAdminAuth] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Cart
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  // Load from storage
   useEffect(() => {
     (async () => {
       const [sv, ov, cv] = await Promise.all([
-        store.get("settings", INIT_SETTINGS),
-        store.get("outlets", INIT_OUTLETS),
-        store.get("catalog", INIT_CATALOG),
+        store.get("kh_settings", INIT_SETTINGS),
+        store.get("kh_outlets", INIT_OUTLETS),
+        store.get("kh_catalog", INIT_CATALOG),
       ]);
       setSettings(sv); setOutlets(ov); setCatalog(cv);
       setLoaded(true);
     })();
   }, []);
 
-  const saveSettings = async (s) => { setSettings(s); await store.set("settings", s); };
-  const saveOutlets = async (o) => { setOutlets(o); await store.set("outlets", o); };
-  const saveCatalog = async (c) => { setCatalog(c); await store.set("catalog", c); };
+  const saveSettings = async (s) => { setSettings(s); await store.set("kh_settings", s); };
+  const saveOutlets  = async (o) => { setOutlets(o);  await store.set("kh_outlets", o); };
+  const saveCatalog  = async (c) => { setCatalog(c);  await store.set("kh_catalog", c); };
 
   const cartTotal = cart.reduce((s, i) => s + (i.price + settings.markup) * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
@@ -269,18 +269,23 @@ export default function App() {
     setCart(prev => {
       const ex = prev.find(i => i.key === key);
       if (ex) return prev.map(i => i.key === key ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { key, id: uid(), productId: product.id, name: product.name, outletName: outlets.find(o=>o.id===product.outletId)?.name||"", emoji: product.emoji, size, price: basePrice }];
+      return [...prev, {
+        key, id: uid(), productId: product.id, name: product.name,
+        outletName: outlets.find(o => o.id === product.outletId)?.name || "",
+        emoji: product.emoji, size, price: basePrice
+      }];
     });
   };
 
   const updateQty = (key, delta) => {
-    setCart(prev => {
-      const next = prev.map(i => i.key === key ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0);
-      return next;
-    });
+    setCart(prev => prev.map(i => i.key === key ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0));
   };
 
-  if (!loaded) return <div style={{background:"#0d0704",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#e8921a",fontFamily:"sans-serif"}}>Memuat...</div>;
+  if (!loaded) return (
+    <div style={{ background:"#0d0704", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#e8921a", fontFamily:"sans-serif" }}>
+      Memuat...
+    </div>
+  );
 
   return (
     <>
@@ -321,7 +326,6 @@ function CustomerView({ outlets, catalog, settings, cart, cartCount, cartTotal, 
 
   return (
     <div>
-      {/* TopBar */}
       <div className="topbar">
         <div className="topbar-logo">☕ {settings.storeName}</div>
         <div className="topbar-right">
@@ -332,7 +336,6 @@ function CustomerView({ outlets, catalog, settings, cart, cartCount, cartTotal, 
         </div>
       </div>
 
-      {/* Hero */}
       <div className="hero">
         <h2>{settings.storeName}</h2>
         <p>{settings.tagline}</p>
@@ -343,35 +346,31 @@ function CustomerView({ outlets, catalog, settings, cart, cartCount, cartTotal, 
         </div>
       </div>
 
-      {/* Outlet Tabs */}
       <div className="outlet-tabs">
         {outlets.map(o => (
-          <button key={o.id} className={`outlet-tab ${selectedOutlet === o.id ? "active" : ""}`} onClick={() => { setSelectedOutlet(o.id); setSelectedCat("Semua"); }}>
+          <button key={o.id} className={`outlet-tab ${selectedOutlet === o.id ? "active" : ""}`}
+            onClick={() => { setSelectedOutlet(o.id); setSelectedCat("Semua"); }}>
             {o.emoji} {o.name}
           </button>
         ))}
       </div>
 
-      {/* Search */}
       <div className="search-bar">
         <input placeholder="🔍 Cari minuman / makanan..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {/* Category Bar */}
       <div className="cat-bar">
         {cats.map(c => (
           <button key={c} className={`cat-btn ${selectedCat === c ? "active" : ""}`} onClick={() => setSelectedCat(c)}>{c}</button>
         ))}
       </div>
 
-      {/* Min order notice */}
       {settings.minItems > 1 && (
         <div style={{padding:"8px 20px",background:"rgba(232,146,26,.08)",borderBottom:"1px solid var(--border)",fontSize:12,color:"var(--amber)"}}>
           ⚠️ Minimum pembelian: <strong>{settings.minItems} item</strong>
         </div>
       )}
 
-      {/* Product Grid */}
       {filtered.length === 0 ? (
         <div className="empty"><span className="empty-icon">😔</span>Produk tidak ditemukan</div>
       ) : (
@@ -380,10 +379,8 @@ function CustomerView({ outlets, catalog, settings, cart, cartCount, cartTotal, 
         </div>
       )}
 
-      {/* Spacer for FAB */}
       <div style={{height:80}} />
 
-      {/* Cart FAB */}
       {cartCount > 0 && (
         <button className="cart-fab" onClick={() => setCartOpen(true)}>
           🛒 Keranjang <span className="badge">{cartCount}</span>
@@ -391,13 +388,12 @@ function CustomerView({ outlets, catalog, settings, cart, cartCount, cartTotal, 
         </button>
       )}
 
-      {/* Cart Drawer */}
       {cartOpen && (
         <CartDrawer cart={cart} settings={settings} updateQty={updateQty}
-          onClose={() => setCartOpen(false)} onCheckout={() => { setCartOpen(false); setCheckoutOpen(true); }} />
+          onClose={() => setCartOpen(false)}
+          onCheckout={() => { setCartOpen(false); setCheckoutOpen(true); }} />
       )}
 
-      {/* Checkout Modal */}
       {checkoutOpen && (
         <CheckoutModal cart={cart} settings={settings} outlets={outlets}
           onClose={() => setCheckoutOpen(false)} />
@@ -423,7 +419,7 @@ function ProductCard({ product, markup, addToCart }) {
         <div className="card-outlet-price">Outlet: {fmt(product.outlet)}</div>
         <div className="card-sizes">
           {sizes.length > 1 && (
-            <div style={{ display:"flex", gap:4, marginBottom:4 }}>
+            <div style={{display:"flex",gap:4,marginBottom:4}}>
               {sizes.map(s => (
                 <button key={s.label} onClick={() => setSelectedSize(s.label)}
                   style={{flex:1,padding:"3px 0",borderRadius:6,fontSize:11,fontWeight:700,
@@ -508,12 +504,19 @@ function CheckoutModal({ cart, settings, outlets, onClose }) {
   const [notes, setNotes] = useState("");
   const [step, setStep] = useState(1);
   const [orderNum] = useState(() => "KH" + Date.now().toString().slice(-6));
+  const [copied, setCopied] = useState(false);
 
   const total = cart.reduce((s, i) => s + (i.price + settings.markup) * i.qty, 0);
 
   const generateMsg = () => {
     const lines = cart.map(i => `• ${i.name} (${i.size}) x${i.qty} = ${fmt((i.price+settings.markup)*i.qty)}`);
     return `🛒 *PESANAN BARU - ${settings.storeName}*\n📋 No. Order: ${orderNum}\n👤 Nama: ${name}\n📱 Telegram: @${tgHandle}\n\n${lines.join("\n")}\n\n💰 *Total: ${fmt(total)}*\n\n📝 Catatan: ${notes || "-"}\n\n✅ Kirim pesan ini ke bot lalu ketik /tampilkan_qris untuk QRIS`;
+  };
+
+  const copyMsg = () => {
+    navigator.clipboard.writeText(generateMsg());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const openTelegram = () => {
@@ -541,7 +544,6 @@ function CheckoutModal({ cart, settings, outlets, onClose }) {
               <label>Catatan (opsional)</label>
               <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. less ice, extra sugar..." />
             </div>
-
             <div className="order-summary">
               {cart.map(i => (
                 <div key={i.key} className="order-line">
@@ -553,11 +555,10 @@ function CheckoutModal({ cart, settings, outlets, onClose }) {
                 <span>Total</span><span>{fmt(total)}</span>
               </div>
             </div>
-
             <div style={{display:"flex",gap:8}}>
               <button className="btn-secondary" style={{flex:1}} onClick={onClose}>Batal</button>
-              <button className="btn-primary" style={{flex:2}} disabled={!name||!tgHandle} onClick={()=>setStep(2)}
-                style={(!name||!tgHandle)?{flex:2,background:"var(--border)",color:"var(--muted)",borderRadius:10,cursor:"default"}:{flex:2}}>
+              <button className="btn-primary" style={{flex:2,...((!name||!tgHandle)?{background:"var(--border)",color:"var(--muted)",cursor:"default"}:{})}}
+                disabled={!name||!tgHandle} onClick={()=>setStep(2)}>
                 Lihat Ringkasan →
               </button>
             </div>
@@ -568,24 +569,18 @@ function CheckoutModal({ cart, settings, outlets, onClose }) {
             <div className="alert-info">
               💡 Salin pesan di bawah, lalu kirim ke bot Telegram. Setelah itu ketik <strong>/tampilkan_qris</strong> untuk mendapat QRIS pembayaran.
             </div>
-
             <div style={{fontSize:12,color:"var(--muted)",marginBottom:6}}>📨 Pesan untuk dikirim ke bot:</div>
             <div className="tg-msg">{generateMsg()}</div>
-
-            <button className="btn-secondary" style={{width:"100%",marginBottom:6,fontSize:12,padding:"8px"}}
-              onClick={() => {navigator.clipboard?.writeText(generateMsg()); alert("Pesan disalin!")}}>
-              📋 Salin Pesan
+            <button className="btn-secondary" style={{width:"100%",marginBottom:8}} onClick={copyMsg}>
+              {copied ? "✅ Tersalin!" : "📋 Salin Pesan"}
             </button>
-
             <button className="btn-tg" onClick={openTelegram}>
-              📲 Buka Telegram → @{settings.telegramBot}
+              📱 Buka @{settings.telegramBot} di Telegram
             </button>
-
-            <div style={{marginTop:12,padding:"10px 14px",background:"rgba(46,125,50,.1)",border:"1px solid rgba(46,125,50,.3)",borderRadius:8,fontSize:12,color:"#81c784"}}>
-              🏪 {settings.qrisInfo}
+            <div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginTop:10,lineHeight:1.5}}>
+              {settings.qrisInfo}
             </div>
-
-            <button className="btn-secondary" style={{width:"100%",marginTop:10}} onClick={onClose}>Tutup</button>
+            <button className="btn-secondary" style={{width:"100%",marginTop:12}} onClick={onClose}>← Kembali</button>
           </>
         )}
       </div>
@@ -595,20 +590,24 @@ function CheckoutModal({ cart, settings, outlets, onClose }) {
 
 // ─── ADMIN VIEW ────────────────────────────────────────────────────────────────
 function AdminView({ outlets, catalog, settings, adminAuth, setAdminAuth, saveOutlets, saveCatalog, saveSettings, setView }) {
-  const [pass, setPass] = useState("");
   const [tab, setTab] = useState("catalog");
+  const [passInput, setPassInput] = useState("");
+  const [passErr, setPassErr] = useState(false);
 
   if (!adminAuth) {
     return (
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg)"}}>
-        <style>{CSS}</style>
-        <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:16,padding:32,width:320}}>
-          <h2 style={{fontSize:22,marginBottom:20,textAlign:"center",color:"var(--amber)"}}>🔐 Admin Login</h2>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg)",padding:20}}>
+        <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:16,padding:32,width:"100%",maxWidth:340}}>
+          <h2 style={{fontSize:22,marginBottom:6,textAlign:"center"}}>⚙️ Admin Panel</h2>
+          <p style={{fontSize:13,color:"var(--muted)",textAlign:"center",marginBottom:24}}>Masukkan password admin</p>
           <div className="form-row">
-            <label>Password</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(pass===settings.adminPass?setAdminAuth(true):alert("Password salah!"))} placeholder="••••••••" />
+            <input type="password" value={passInput} onChange={e=>{setPassInput(e.target.value);setPassErr(false)}}
+              placeholder="Password..." onKeyDown={e=>e.key==="Enter"&&(passInput===settings.adminPass?setAdminAuth(true):setPassErr(true))} />
+            {passErr && <div style={{color:"#ef9a9a",fontSize:12,marginTop:4}}>❌ Password salah</div>}
           </div>
-          <button className="btn-primary" style={{width:"100%",marginTop:8}} onClick={()=>pass===settings.adminPass?setAdminAuth(true):alert("Password salah!")}>Masuk</button>
+          <button className="btn-primary" onClick={()=>passInput===settings.adminPass?setAdminAuth(true):setPassErr(true)}>
+            Masuk
+          </button>
           <button className="btn-secondary" style={{width:"100%",marginTop:8}} onClick={()=>setView("customer")}>← Kembali ke Toko</button>
         </div>
       </div>
@@ -624,16 +623,14 @@ function AdminView({ outlets, catalog, settings, adminAuth, setAdminAuth, saveOu
           <button className="btn-secondary" style={{fontSize:12,padding:"5px 10px"}} onClick={()=>setAdminAuth(false)}>Logout</button>
         </div>
       </div>
-
       <div className="admin-nav">
         {[["catalog","📦 Katalog"],["outlets","🏪 Outlet"],["settings","⚙️ Pengaturan"]].map(([t,l])=>(
           <button key={t} className={`nav-tab ${tab===t?"active":""}`} onClick={()=>setTab(t)}>{l}</button>
         ))}
       </div>
-
       <div className="admin-body">
-        {tab==="catalog" && <CatalogTab catalog={catalog} outlets={outlets} settings={settings} saveCatalog={saveCatalog} />}
-        {tab==="outlets" && <OutletsTab outlets={outlets} saveOutlets={saveOutlets} />}
+        {tab==="catalog"  && <CatalogTab  catalog={catalog} outlets={outlets} settings={settings} saveCatalog={saveCatalog} />}
+        {tab==="outlets"  && <OutletsTab  outlets={outlets} saveOutlets={saveOutlets} />}
         {tab==="settings" && <SettingsTab settings={settings} saveSettings={saveSettings} />}
       </div>
     </div>
@@ -654,7 +651,7 @@ function CatalogTab({ catalog, outlets, settings, saveCatalog }) {
   );
 
   const deleteItem = (id) => {
-    if (confirm("Hapus produk ini?")) saveCatalog(catalog.filter(p=>p.id!==id));
+    if (window.confirm("Hapus produk ini?")) saveCatalog(catalog.filter(p=>p.id!==id));
   };
 
   const saveItem = (item) => {
@@ -672,9 +669,11 @@ function CatalogTab({ catalog, outlets, settings, saveCatalog }) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
         <h3 style={{fontSize:20}}>📦 Katalog Produk ({catalog.length})</h3>
-        <button className="btn-primary" style={{padding:"8px 16px",fontSize:13}} onClick={()=>{setEditItem({outletId:outlets[0]?.id||"",name:"",cat:"Kopi",r:"",l:"",outlet:"",emoji:"☕"});setShowForm(true)}}>+ Tambah Produk</button>
+        <button className="btn-primary" style={{padding:"8px 16px",fontSize:13}}
+          onClick={()=>{setEditItem({outletId:outlets[0]?.id||"",name:"",cat:"Kopi",r:"",l:"",outlet:"",emoji:"☕"});setShowForm(true)}}>
+          + Tambah Produk
+        </button>
       </div>
-
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         <select value={filterOutlet} onChange={e=>setFilterOutlet(e.target.value)} style={{width:"auto",flex:1,minWidth:120}}>
           <option value="all">Semua Outlet</option>
@@ -684,7 +683,6 @@ function CatalogTab({ catalog, outlets, settings, saveCatalog }) {
           {cats.map(c=><option key={c} value={c}>{c==="all"?"Semua Kategori":c}</option>)}
         </select>
       </div>
-
       <div style={{overflowX:"auto"}}>
         <table className="table">
           <thead>
@@ -707,8 +705,9 @@ function CatalogTab({ catalog, outlets, settings, saveCatalog }) {
                   <td style={{color:"var(--amber)",fontWeight:600}}>{p.r?fmt(p.r+settings.markup):"-"}</td>
                   <td style={{color:"var(--amber)",fontWeight:600}}>{p.l?fmt(p.l+settings.markup):"-"}</td>
                   <td>
-                    <div style={{display:"flex",gap:4"}}>
-                      <button style={{background:"rgba(232,146,26,.15)",color:"var(--amber)",border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}} onClick={()=>{setEditItem(p);setShowForm(true)}}>Edit</button>
+                    <div style={{display:"flex",gap:4}}>
+                      <button style={{background:"rgba(232,146,26,.15)",color:"var(--amber)",border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}}
+                        onClick={()=>{setEditItem(p);setShowForm(true)}}>Edit</button>
                       <button className="btn-danger" onClick={()=>deleteItem(p.id)}>Hapus</button>
                     </div>
                   </td>
@@ -718,7 +717,6 @@ function CatalogTab({ catalog, outlets, settings, saveCatalog }) {
           </tbody>
         </table>
       </div>
-
       {showForm && editItem && (
         <ProductForm item={editItem} outlets={outlets} onSave={saveItem} onClose={()=>{setEditItem(null);setShowForm(false)}} />
       )}
@@ -759,16 +757,16 @@ function ProductForm({ item, outlets, onSave, onClose }) {
         </div>
         <div className="form-grid">
           <div className="form-row">
-            <label>Harga Orang Dalem R (kosongkan jika tak ada)</label>
+            <label>Harga Orang Dalem R</label>
             <input type="number" value={form.r||""} onChange={e=>set("r",e.target.value?Number(e.target.value):null)} placeholder="cth: 14500" />
           </div>
           <div className="form-row">
-            <label>Harga Orang Dalem L (kosongkan jika tak ada)</label>
+            <label>Harga Orang Dalem L</label>
             <input type="number" value={form.l||""} onChange={e=>set("l",e.target.value?Number(e.target.value):null)} placeholder="cth: 19500" />
           </div>
         </div>
         <div className="form-row">
-          <label>Harga Outlet Normal (untuk perbandingan)</label>
+          <label>Harga Outlet Normal</label>
           <input type="number" value={form.outlet||""} onChange={e=>set("outlet",Number(e.target.value))} placeholder="cth: 22000" />
         </div>
         <div style={{display:"flex",gap:8,marginTop:4}}>
@@ -786,7 +784,7 @@ function OutletsTab({ outlets, saveOutlets }) {
   const [showForm, setShowForm] = useState(false);
 
   const deleteOutlet = (id) => {
-    if (confirm("Hapus outlet ini? Produk yang terkait tidak akan terhapus.")) saveOutlets(outlets.filter(o=>o.id!==id));
+    if (window.confirm("Hapus outlet ini? Produk yang terkait tidak akan terhapus.")) saveOutlets(outlets.filter(o=>o.id!==id));
   };
   const saveOutlet = (outlet) => {
     if (outlet.id && outlets.find(o=>o.id===outlet.id)) {
@@ -801,11 +799,12 @@ function OutletsTab({ outlets, saveOutlets }) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <h3 style={{fontSize:20}}>🏪 Outlet ({outlets.length})</h3>
-        <button className="btn-primary" style={{padding:"8px 16px",fontSize:13}} onClick={()=>{setEditOutlet({name:"",emoji:"🏪",color:"#e8921a"});setShowForm(true)}}>+ Tambah Outlet</button>
+        <button className="btn-primary" style={{padding:"8px 16px",fontSize:13}}
+          onClick={()=>{setEditOutlet({name:"",emoji:"🏪",color:"#e8921a"});setShowForm(true)}}>
+          + Tambah Outlet
+        </button>
       </div>
-
       <div className="alert-info">💡 Tambahkan outlet lain seperti KFC, McDonald's, dll. Kemudian tambahkan produk dengan memilih outlet tersebut di tab Katalog.</div>
-
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {outlets.map(o => (
           <div key={o.id} style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
@@ -815,13 +814,13 @@ function OutletsTab({ outlets, saveOutlets }) {
               <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>ID: {o.id} · Warna: <span style={{background:o.color,padding:"1px 8px",borderRadius:4,color:"#fff",fontSize:11}}>{o.color}</span></div>
             </div>
             <div style={{display:"flex",gap:6}}>
-              <button style={{background:"rgba(232,146,26,.15)",color:"var(--amber)",border:"none",borderRadius:6,padding:"6px 12px",fontSize:12,cursor:"pointer"}} onClick={()=>{setEditOutlet(o);setShowForm(true)}}>Edit</button>
+              <button style={{background:"rgba(232,146,26,.15)",color:"var(--amber)",border:"none",borderRadius:6,padding:"6px 12px",fontSize:12,cursor:"pointer"}}
+                onClick={()=>{setEditOutlet(o);setShowForm(true)}}>Edit</button>
               <button className="btn-danger" onClick={()=>deleteOutlet(o.id)}>Hapus</button>
             </div>
           </div>
         ))}
       </div>
-
       {showForm && editOutlet && (
         <div className="modal">
           <div className="modal-box" style={{maxWidth:360}}>
@@ -857,13 +856,11 @@ function SettingsTab({ settings, saveSettings }) {
   return (
     <div style={{maxWidth:500}}>
       <h3 style={{fontSize:20,marginBottom:16}}>⚙️ Pengaturan Toko</h3>
-
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:20,marginBottom:16}}>
         <h4 style={{fontSize:15,marginBottom:14,color:"var(--amber)"}}>🏪 Info Toko</h4>
         <div className="form-row"><label>Nama Toko</label><input value={form.storeName} onChange={e=>set("storeName",e.target.value)} /></div>
         <div className="form-row"><label>Tagline</label><input value={form.tagline} onChange={e=>set("tagline",e.target.value)} /></div>
       </div>
-
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:20,marginBottom:16}}>
         <h4 style={{fontSize:15,marginBottom:14,color:"var(--amber)"}}>💰 Harga & Order</h4>
         <div className="form-row">
@@ -876,7 +873,6 @@ function SettingsTab({ settings, saveSettings }) {
           <input type="number" min="1" value={form.minItems} onChange={e=>set("minItems",Number(e.target.value))} />
         </div>
       </div>
-
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:20,marginBottom:16}}>
         <h4 style={{fontSize:15,marginBottom:14,color:"#229ed9"}}>📱 Telegram</h4>
         <div className="form-row">
@@ -888,7 +884,6 @@ function SettingsTab({ settings, saveSettings }) {
           <textarea value={form.qrisInfo} onChange={e=>set("qrisInfo",e.target.value)} rows={3} style={{resize:"vertical"}} />
         </div>
       </div>
-
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:20,marginBottom:20}}>
         <h4 style={{fontSize:15,marginBottom:14,color:"var(--red)"}}>🔐 Keamanan</h4>
         <div className="form-row">
@@ -896,7 +891,6 @@ function SettingsTab({ settings, saveSettings }) {
           <input type="password" value={form.adminPass} onChange={e=>set("adminPass",e.target.value)} />
         </div>
       </div>
-
       <button className="btn-primary" style={{width:"100%"}} onClick={save}>
         {saved ? "✅ Tersimpan!" : "💾 Simpan Pengaturan"}
       </button>
